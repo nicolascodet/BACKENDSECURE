@@ -1,0 +1,47 @@
+# =============================================================================
+# TERRAFORM VARIABLES EXAMPLE - ENTERPRISE BACKEND
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values
+
+# Required Variables
+project_id   = "your-gcp-project-id"
+region       = "us-central1"
+environment  = "production"
+service_name = "enterprise-backend"
+
+# Scaling Configuration
+min_instances = 0
+max_instances = 100
+cpu_limit     = "2"
+memory_limit  = "2Gi"
+
+# Infrastructure Options
+enable_database = true
+enable_redis    = false
+enable_vpc      = true
+
+# Database Configuration
+database_tier           = "db-f1-micro"
+backup_retention_days   = 7
+
+# Redis Configuration (if enabled)
+redis_memory_gb = 1
+
+# Security Configuration
+security_headers_enabled = true
+rate_limit_per_minute   = 100
+max_login_attempts      = 5
+lockout_duration_minutes = 15
+jwt_expiration_hours    = 24
+session_timeout_minutes = 30
+
+# CORS Configuration
+cors_allowed_origins = [
+  "https://your-frontend.com",
+  "https://admin.your-domain.com"
+]
+
+# Monitoring (optional)
+alert_notification_channels = [
+  # "projects/your-project/notificationChannels/your-channel-id"
+]
