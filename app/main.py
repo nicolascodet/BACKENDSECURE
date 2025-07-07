@@ -36,11 +36,13 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return response
 
 # CORS middleware
+# Configure allowed origins from environment variable (pipe-separated for Cloud Run)
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000|http://localhost:5173").split("|")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

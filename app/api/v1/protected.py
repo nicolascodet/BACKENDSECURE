@@ -4,14 +4,25 @@ from typing import List
 
 from ...core.auth import get_current_user, get_current_active_user, get_government_user
 from ...core.middleware import limiter
+from ...core.database import log_audit_event
 from ...schemas.user import UserResponse
 
 router = APIRouter(prefix="/protected", tags=["Protected Endpoints"])
 
 @router.get("/profile", response_model=UserResponse)
-async def get_profile(current_user: dict = Depends(get_current_active_user)):
+async def get_profile(request: Request, current_user: dict = Depends(get_current_active_user)):
     """Get user profile (requires authentication)"""
     from datetime import datetime
+    
+    # Log profile access
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="profile_accessed",
+        endpoint="/protected/profile",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     return UserResponse(
         id=current_user["id"],
         email=current_user["email"],
@@ -27,6 +38,16 @@ async def get_profile(current_user: dict = Depends(get_current_active_user)):
 @limiter.limit(f"{os.getenv('RATE_LIMIT_PER_MINUTE', '100')}/minute")
 async def dashboard(request: Request, current_user: dict = Depends(get_current_active_user)):
     """User dashboard (requires authentication)"""
+    
+    # Log dashboard access
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="dashboard_accessed",
+        endpoint="/protected/dashboard",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     return {
         "message": f"Welcome to your dashboard, {current_user['email']}!",
         "user_type": "Government User" if current_user["is_government"] else "Regular User",
@@ -45,7 +66,7 @@ async def dashboard(request: Request, current_user: dict = Depends(get_current_a
     }
 
 @router.get("/government-only")
-async def government_only(current_user: dict = Depends(get_government_user)):
+async def government_only(request: Request, current_user: dict = Depends(get_government_user)):
     """Government users only endpoint"""
     return {
         "message": "This is classified government information",
@@ -67,8 +88,18 @@ async def government_only(current_user: dict = Depends(get_government_user)):
     }
 
 @router.get("/admin")
-async def admin_endpoint(current_user: dict = Depends(get_current_active_user)):
+async def admin_endpoint(request: Request, current_user: dict = Depends(get_current_active_user)):
     """Admin endpoint (could add admin role check)"""
+    
+    # Log admin access attempt
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="admin_panel_accessed",
+        endpoint="/protected/admin",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     # In production, add admin role verification
     return {
         "message": "Admin panel access",
@@ -87,6 +118,16 @@ async def admin_endpoint(current_user: dict = Depends(get_current_active_user)):
 @limiter.limit("10/minute")  # Lower rate limit for usage stats
 async def api_usage(request: Request, current_user: dict = Depends(get_current_active_user)):
     """Get API usage statistics"""
+    
+    # Log API usage stats access
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="api_usage_viewed",
+        endpoint="/protected/api-usage",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     return {
         "user_id": current_user["id"],
         "api_calls_today": 0,
@@ -105,6 +146,16 @@ async def api_usage(request: Request, current_user: dict = Depends(get_current_a
 @limiter.limit(f"{os.getenv('RATE_LIMIT_PER_MINUTE', '100')}/minute")
 async def get_contracts(request: Request, current_user: dict = Depends(get_current_active_user)):
     """Get user's contract monitoring data"""
+    
+    # Log contract data access
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="contract_data_accessed",
+        endpoint="/protected/contracts",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
     return {
         "message": "Contract monitoring system",
         "user": current_user["email"],
@@ -121,11 +172,26 @@ async def get_contracts(request: Request, current_user: dict = Depends(get_curre
 
 @router.post("/contracts/monitor")
 async def create_contract_monitor(
+    request: Request,
     keywords: List[str],
     agencies: List[str] = [],
     current_user: dict = Depends(get_current_active_user)
 ):
     """Create a new contract monitoring alert"""
+    
+    # Log contract monitor creation
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="contract_monitor_created",
+        endpoint="/protected/contracts/monitor",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        details={
+            "keywords": keywords,
+            "agencies": agencies
+        }
+    )
+    
     return {
         "message": "Contract monitor created successfully",
         "monitor_id": "monitor_123",
@@ -133,4 +199,29 @@ async def create_contract_monitor(
         "agencies": agencies,
         "user_id": current_user["id"],
         "status": "active"
+    }
+
+@router.get("/audit-logs")
+@limiter.limit("20/minute")  # Limited rate for audit log access
+async def get_user_audit_logs(request: Request, current_user: dict = Depends(get_current_active_user)):
+    """Get current user's audit logs"""
+    from ...core.database import audit_log_db
+    
+    # Log audit log access
+    await log_audit_event(
+        user_id=current_user["id"],
+        action="audit_logs_accessed",
+        endpoint="/protected/audit-logs",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent")
+    )
+    
+    # Get user's audit logs
+    logs = await audit_log_db.get_audit_logs(user_id=current_user["id"], limit=50)
+    
+    return {
+        "message": "User audit logs",
+        "user_id": current_user["id"],
+        "total_logs": len(logs),
+        "logs": logs
     }
